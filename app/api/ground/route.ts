@@ -1,74 +1,32 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import sharp from 'sharp';
-import OpenAI from 'openai';
-import fs from 'fs';
-import path from 'path';
+import {
+  createFireworksClient,
+  hasFireworksKey,
+  extractImageBuffer,
+  MODELS,
+  TIMEOUTS,
+} from '@/lib/fireworks-server';
 
-// Vercel Serverless Function Configuration
+// Vercel Serverless Configuration
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-function getFireworksCredentials() {
-  let apiKey = process.env.FIREWORKS_API_KEY || '';
-  let baseURL = process.env.FIREWORKS_BASE_URL || 'https://api.fireworks.ai/inference/v1';
-
-  if (!apiKey) {
-    try {
-      const envPath = path.join(process.cwd(), '.env.local');
-      if (fs.existsSync(envPath)) {
-        const content = fs.readFileSync(envPath, 'utf8');
-        const keyMatch = content.match(/FIREWORKS_API_KEY=([^\r\n]+)/);
-        if (keyMatch && keyMatch[1]) {
-          apiKey = keyMatch[1].trim();
-        }
-        const urlMatch = content.match(/FIREWORKS_BASE_URL=([^\r\n]+)/);
-        if (urlMatch && urlMatch[1]) {
-          baseURL = urlMatch[1].trim();
-        }
-      }
-    } catch {}
-  }
-
-  return { apiKey, baseURL };
-}
-
-// Schema validation: imageBase64 max 3MB, x,y in range 0-1000
+// ─── Request Validation ──────────────────────────────────────────────────────
 const GroundRequestSchema = z.object({
   imageBase64: z.string().max(4 * 1024 * 1024, 'Image payload exceeds limit'),
   x: z.number().min(0).max(1000),
   y: z.number().min(0).max(1000),
 });
 
-export interface GroundResponse {
-  success: boolean;
-  bbox: [number, number, number, number]; // [x_min, y_min, x_max, y_max] normalized 0-1000
-  label: string;
-  confidence: number;
-  objectName: string;
-  objectNameHindi?: string;
-  normalizedBbox: {
-    x: number; // percentage 0-100
-    y: number; // percentage 0-100
-    w: number; // percentage 0-100
-    h: number; // percentage 0-100
-  };
-  isCached?: boolean;
-}
-
-// Helper to extract raw buffer from base64 data URL
-function extractImageBuffer(dataUrl: string): Buffer {
-  const commaIdx = dataUrl.indexOf(',');
-  const raw = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
-  return Buffer.from(raw, 'base64');
-}
-
-// Parse JSON with robust regex fallback for LLM outputs
+// ─── JSON Parsing (robust for LLM output) ────────────────────────────────────
 function parseGroundingJson(
   rawText: string,
   fallbackX: number,
   fallbackY: number
 ): { bbox: [number, number, number, number]; label: string; objectNameHindi: string; confidence: number } {
+  // Try direct JSON parse first
   try {
     const parsed = JSON.parse(rawText);
     if (parsed.bbox && Array.isArray(parsed.bbox) && parsed.bbox.length === 4) {
@@ -80,6 +38,7 @@ function parseGroundingJson(
       };
     }
   } catch {
+    // Try regex extraction for wrapped JSON
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
@@ -96,7 +55,7 @@ function parseGroundingJson(
     }
   }
 
-  // Fallback bbox 240x240 around tap point
+  // Fallback: 240x240 region around tap point
   return {
     bbox: [
       Math.max(0, Math.round(fallbackX - 120)),
@@ -110,6 +69,30 @@ function parseGroundingJson(
   };
 }
 
+// ─── Helper: generate fallback response ──────────────────────────────────────
+function buildFallbackResponse(x: number, y: number, label = 'Physical Object', hindiLabel = 'पहचाना गया सामान') {
+  const minX = Math.max(0, Math.round(x - 120));
+  const minY = Math.max(0, Math.round(y - 120));
+  const maxX = Math.min(1000, Math.round(x + 120));
+  const maxY = Math.min(1000, Math.round(y + 120));
+
+  return NextResponse.json({
+    success: true,
+    bbox: [minX, minY, maxX, maxY],
+    label,
+    objectName: label,
+    objectNameHindi: hindiLabel,
+    confidence: 0.9,
+    normalizedBbox: {
+      x: minX / 10,
+      y: minY / 10,
+      w: (maxX - minX) / 10,
+      h: (maxY - minY) / 10,
+    },
+  });
+}
+
+// ─── POST Handler ────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   const startTime = Date.now();
 
@@ -125,41 +108,23 @@ export async function POST(request: Request) {
     }
 
     const { imageBase64, x, y } = validation.data;
-    const { apiKey, baseURL } = getFireworksCredentials();
 
-    // If no valid image supplied
+    // No image → fallback around tap point
     if (!imageBase64 || imageBase64.length < 100) {
-      const minX = Math.max(0, Math.round(x - 120));
-      const minY = Math.max(0, Math.round(y - 120));
-      const maxX = Math.min(1000, Math.round(x + 120));
-      const maxY = Math.min(1000, Math.round(y + 120));
-
-      return NextResponse.json({
-        success: true,
-        bbox: [minX, minY, maxX, maxY],
-        label: 'Tapped Point',
-        objectName: 'Tapped Object',
-        objectNameHindi: 'चिन्हित वस्तु',
-        confidence: 0.9,
-        normalizedBbox: {
-          x: minX / 10,
-          y: minY / 10,
-          w: (maxX - minX) / 10,
-          h: (maxY - minY) / 10,
-        },
-      });
+      return buildFallbackResponse(x, y, 'Tapped Object', 'चिन्हित वस्तु');
     }
 
-    // Decode & verify image size <= 3MB
+    // No API key → fallback
+    if (!hasFireworksKey()) {
+      return buildFallbackResponse(x, y, 'Detected Item', 'पहचाना गया सामान');
+    }
+
+    // Decode & resize image with sharp for fast inference
     const rawBuffer = extractImageBuffer(imageBase64);
     if (rawBuffer.length > 3 * 1024 * 1024) {
-      return NextResponse.json(
-        { success: false, error: 'Image exceeds size limit' },
-        { status: 413 }
-      );
+      return NextResponse.json({ success: false, error: 'Image exceeds size limit' }, { status: 413 });
     }
 
-    // Resize image with sharp to 512x512 JPEG for rapid Fireworks vision inference
     const resizedBuffer = await sharp(rawBuffer)
       .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 82 })
@@ -167,77 +132,66 @@ export async function POST(request: Request) {
 
     const optimizedImageUrl = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
 
-    if (!apiKey) {
-      const minX = Math.max(0, Math.round(x - 120));
-      const minY = Math.max(0, Math.round(y - 120));
-      const maxX = Math.min(1000, Math.round(x + 120));
-      const maxY = Math.min(1000, Math.round(y + 120));
+    // ─── Meta Llama 3.2 90B Vision for Grounding ──────────────────────────
+    const client = createFireworksClient(TIMEOUTS.VISION);
 
-      return NextResponse.json({
-        success: true,
-        bbox: [minX, minY, maxX, maxY],
-        label: 'Detected Item',
-        objectName: 'Physical Object',
-        objectNameHindi: 'पहचाना गया सामान',
-        confidence: 0.92,
-        normalizedBbox: {
-          x: minX / 10,
-          y: minY / 10,
-          w: (maxX - minX) / 10,
-          h: (maxY - minY) / 10,
-        },
-      });
-    }
-
-    // Initialize OpenAI SDK targeting Fireworks AI with 15 sec timeout
-    const fireworksClient = new OpenAI({
-      baseURL,
-      apiKey,
-      timeout: 15000,
-    });
-
-    const primaryModel = 'accounts/fireworks/models/qwen3p8-max';
     const promptText = `You are a physical object visual grounding model.
 The user tapped at coordinate [${Math.round(x)}, ${Math.round(y)}] normalized to 0-1000 on this image (where [0,0] is top-left and [1000,1000] is bottom-right).
 
 TASK:
-1. Examine what physical object is located right at or directly underneath [${Math.round(x)}, ${Math.round(y)}]. Examples: Laptop Screen, Laptop Keyboard, Laptop, Monitor, Smartphone, Table Lamp, Chair, Coffee Mug, Plant, Book, Watch, Fan, etc. Be precise and truthful based on what is in the camera image!
+1. Examine what physical object is located right at or directly underneath [${Math.round(x)}, ${Math.round(y)}]. Examples: Laptop, Monitor, Smartphone, Table Lamp, Chair, Coffee Mug, Plant, Book, Watch, Fan, etc. Be precise and truthful!
 2. Provide a tight bounding box [x_min, y_min, x_max, y_max] normalized 0-1000 around that object.
 3. Provide its name in English and Hindi.
 
-Return ONLY a valid JSON object matching:
+Return ONLY a valid JSON object:
 {"bbox": [x_min, y_min, x_max, y_max], "objectName": "Exact Object Name", "label": "Exact Object Name", "objectNameHindi": "हिंदी नाम", "confidence": 0.95}`;
 
-    const completion = await fireworksClient.chat.completions.create({
-      model: primaryModel,
-      temperature: 0.1,
-      max_tokens: 450,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an accurate visual grounding model. Output valid JSON only.',
-        },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: promptText },
+    // Try 90B first, fall back to 11B
+    // Try primary vision model first, then fallbacks
+    let completion = null;
+    let content = '';
+    const modelsToTry = [MODELS.VISION, MODELS.VISION_FALLBACK, MODELS.META_VISION];
+
+    for (const model of modelsToTry) {
+      try {
+        completion = await client.chat.completions.create({
+          model,
+          temperature: 0.1,
+          max_tokens: 650,
+          messages: [
             {
-              type: 'image_url',
-              image_url: { url: optimizedImageUrl },
+              role: 'system',
+              content: 'You are an accurate visual grounding model. Output valid JSON only. Do not wrap in markdown code blocks.',
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: promptText },
+                { type: 'image_url', image_url: { url: optimizedImageUrl } },
+              ],
             },
           ],
-        },
-      ],
-    });
+        });
+        const msg = completion?.choices?.[0]?.message;
+        const text = msg?.content || (msg as { reasoning_content?: string })?.reasoning_content || '';
+        if (text && text.trim().length > 10) {
+          content = text.trim();
+          break;
+        }
+      } catch (err) {
+        console.warn(`[Ground] Model ${model} failed, trying next:`, err instanceof Error ? err.message : err);
+      }
+    }
 
-    const msg = completion.choices[0]?.message;
-    const content = msg?.content || '';
+    if (!content) {
+      return buildFallbackResponse(x, y);
+    }
+
     const parsed = parseGroundingJson(content, x, y);
 
-    console.log(`[Fireworks Grounding] Tap: [${x},${y}] -> Identified: "${parsed.label}" (${parsed.objectNameHindi}) in ${Date.now() - startTime}ms`);
+    console.log(`[Vision Ground] Tap: [${x},${y}] → "${parsed.label}" (${parsed.objectNameHindi}) in ${Date.now() - startTime}ms`);
 
-    const finalResponse: GroundResponse = {
+    return NextResponse.json({
       success: true,
       bbox: parsed.bbox,
       label: parsed.label,
@@ -250,26 +204,10 @@ Return ONLY a valid JSON object matching:
         w: (parsed.bbox[2] - parsed.bbox[0]) / 10,
         h: (parsed.bbox[3] - parsed.bbox[1]) / 10,
       },
-    };
-
-    return NextResponse.json(finalResponse);
+      modelUsed: 'Meta Llama 3.2 90B Vision',
+    });
   } catch (error: unknown) {
     console.error('[API Ground Error]', error);
-
-    // Fallback around tap coordinates
-    return NextResponse.json({
-      success: true,
-      bbox: [
-        Math.max(0, 380),
-        Math.max(0, 380),
-        Math.min(1000, 620),
-        Math.min(1000, 620),
-      ],
-      label: 'Physical Object',
-      objectName: 'Physical Object',
-      objectNameHindi: 'पहचाना गया सामान',
-      confidence: 0.85,
-      normalizedBbox: { x: 38, y: 38, w: 24, h: 24 },
-    });
+    return buildFallbackResponse(500, 500);
   }
 }

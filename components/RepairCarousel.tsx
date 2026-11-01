@@ -183,7 +183,7 @@ export const RepairCarousel: React.FC = () => {
                 समाधान योजना तैयार हो रही है...
               </h3>
               <p className="text-xs text-white/60 max-w-xs leading-relaxed">
-                30B रीजनिंग मॉडल {objectName} के लिए शास्त्रीय और सुरक्षित कदम तैयार कर रहा है।
+                Meta Llama 4 Scout मॉडल {objectName} के लिए शास्त्रीय और सुरक्षित कदम तैयार कर रहा है।
               </p>
             </div>
           )}
@@ -361,7 +361,11 @@ export const RepairCarousel: React.FC = () => {
 
           {/* 4. Bottom Classical External Help Link */}
           <footer className="w-full pt-2 border-t border-white/10 flex items-center justify-between text-xs text-white/60">
-            <span className="text-[11px]">BOLO Bharat Classical Repair Assistant</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-white/50">
+              <span>BOLO Bharat</span>
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              <span className="text-white/40">{planData?.modelUsed || 'Meta Llama 4 Scout'}</span>
+            </div>
             <a
               href={youtubeGuideUrl}
               target="_blank"

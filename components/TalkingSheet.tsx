@@ -43,20 +43,23 @@ export const TalkingSheet: React.FC = () => {
     }
   }, [setTranscript, setIsTalking]);
 
-  // When status becomes TALKING, trigger dialogue generation
+  // When status becomes TALKING, use existing transcript or fetch new one
   useEffect(() => {
     if (status === 'TALKING' && objectName) {
-      if (!transcript || transcript.includes('is speaking')) {
+      // Only fetch if we have no real transcript yet
+      if (!transcript || transcript.length < 10) {
         fetchDialogue(objectName);
-      } else {
+      } else if (fullText !== transcript) {
+        // Transcript already provided by the tap pipeline — use it directly
         setFullText(transcript);
-        setDisplayedLength(transcript.length);
+        setDisplayedLength(0); // triggers typewriter animation
         setIsTalking(true);
       }
     } else if (status !== 'TALKING') {
       setIsTalking(false);
     }
-  }, [status, objectName, transcript, fetchDialogue, setIsTalking]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, objectName, transcript]);
 
   // Smooth Indic typewriter animation
   useEffect(() => {
@@ -153,10 +156,14 @@ export const TalkingSheet: React.FC = () => {
                 <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
                   {objectName || 'पहचाना गया सामान'}
                 </h3>
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping" />
                   <span className="text-[12px] font-semibold text-[#10B981]">
                     लाइव आवाज़ • Bol raha hai
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-white/20" />
+                  <span className="text-[10px] font-medium text-white/50 px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
+                    Meta Llama 4
                   </span>
                 </div>
               </div>

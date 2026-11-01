@@ -107,8 +107,8 @@ export const CameraView: React.FC<CameraViewProps> = ({ onTap, children }) => {
         playsInline
         muted
         autoPlay
-        className={`absolute inset-0 w-full h-full object-cover rounded-[36px] transition-opacity duration-300 z-10 ${
-          isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        className={`absolute inset-0 w-full h-full object-cover rounded-[36px] transition-opacity duration-300 z-10 pointer-events-none ${
+          isActive ? 'opacity-100' : 'opacity-0'
         }`}
       />
 
