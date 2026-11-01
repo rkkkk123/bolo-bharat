@@ -1,279 +1,377 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBoloStore } from '@/store/useBoloStore';
-import { Search, Video, X, ArrowLeft, CheckCircle2, ExternalLink } from 'lucide-react';
+import { speakImmediate, stopSpeech } from '@/lib/speech';
+import {
+  Wrench,
+  X,
+  ArrowLeft,
+  ChevronRight,
+  ChevronLeft,
+  Volume2,
+  Clock,
+  ShieldAlert,
+  CheckCircle2,
+  ExternalLink,
+  Sparkles,
+} from 'lucide-react';
 
-interface RepairStep {
+interface RepairStepItem {
   stepNumber: number;
-  titleHindi: string;
-  descHindi: string;
-  imageEmoji: string;
-  tag: string;
+  title: string;
+  explanation: string;
+  actionTip: string;
+  caution: string;
+}
+
+interface RepairPlanData {
+  objectName: string;
+  summaryHindi: string;
+  estimatedTime: string;
+  difficulty: string;
+  toolsRequired: string[];
+  steps: RepairStepItem[];
+  modelUsed?: string;
 }
 
 export const RepairCarousel: React.FC = () => {
-  const { status, objectName, setStatus, resetToIdle, repairSteps } = useBoloStore();
-  const [activeStep, setActiveStep] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { status, objectName, setStatus, resetToIdle } = useBoloStore();
+  const [activeStepIdx, setActiveStepIdx] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [planData, setPlanData] = useState<RepairPlanData | null>(null);
+  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
 
-  // Dynamic repair guides tailored to the grounded object
-  const getSteps = (name?: string | null): RepairStep[] => {
-    // If AI generated dynamic repair steps exist from Fireworks, prioritize them
-    if (repairSteps && repairSteps.length > 0) {
-      return repairSteps.slice(0, 3).map((stepText, idx) => {
-        const cleanText = stepText.replace(/^\d+[\.\-\:]\s*/, '');
-        return {
-          stepNumber: idx + 1,
-          titleHindi: cleanText.length > 35 ? cleanText.slice(0, 32) + '...' : cleanText,
-          descHindi: stepText,
-          imageEmoji: idx === 0 ? '🛠️' : idx === 1 ? '🧰' : '✨',
-          tag: idx === 0 ? 'निरीक्षण' : idx === 1 ? 'समाधान' : 'सत्यापन',
-        };
+  // Fetch 30B / Muse / Glimmer planned solution from /api/plan
+  const fetchPlan = useCallback(async (objName: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objectName: objName }),
       });
+      const data = await res.json();
+      if (data.success && data.steps && data.steps.length > 0) {
+        setPlanData(data);
+      } else {
+        throw new Error('Fallback needed');
+      }
+    } catch {
+      // Classical craftsmanship fallback
+      setPlanData({
+        objectName: objName,
+        summaryHindi: `${objName} की मरम्मत और सुरक्षित देखभाल का शास्त्रीय समाधान`,
+        estimatedTime: '10-15 मिनट',
+        difficulty: 'मध्यम (Moderate)',
+        toolsRequired: ['माइक्रोफाइबर कपड़ा', 'सॉफ्ट ब्रश', 'सुरक्षित सतह'],
+        steps: [
+          {
+            stepNumber: 1,
+            title: 'सुरक्षा और प्राथमिक निरीक्षण (Safety Check)',
+            explanation: `सबसे पहले ${objName} की स्थिति, बाहरी आवरण और कनेक्शन का बारीकी से निरीक्षण करें। किसी भी ढीले तार या क्रैक को पहचानें।`,
+            actionTip: 'पावर केबल को पहले अनप्लग करें और उपकरण को स्थिर मेज पर रखें।',
+            caution: 'गीले हाथों या धातु के नुकीले औजारों से नाजुक सतह को न छुएं।',
+          },
+          {
+            stepNumber: 2,
+            title: 'सफाई और पुर्जों का संयोजन (Cleaning & Adjustment)',
+            explanation: 'माइक्रोफाइबर कपड़े या सूखे ब्रश से कोनों और वेंट्स से धूल हटाएं ताकि हवा का प्रवाह और प्रदर्शन सामान्य बना रहे।',
+            actionTip: 'हल्के हाथों से सतह को गोल घुमाते हुए पोंछें।',
+            caution: 'किसी भी कठोर केमिकल या पानी का सीधा छिड़काव न करें।',
+          },
+          {
+            stepNumber: 3,
+            title: 'सॉफ्टवेयर / सेटिंग्स रीसेट (Calibration)',
+            explanation: 'यदि उपकरण इलेक्ट्रॉनिक है, तो रीसेट बटन या सेटिंग्स में जाकर डिफॉल्ट कॉन्फ़िगरेशन को पुनः लागू करें।',
+            actionTip: 'पावर बटन को 10 सेकंड दबाकर रीस्टार्ट करें।',
+            caution: 'अधूरे अपडेट के दौरान उपकरण को बंद न करें।',
+          },
+          {
+            stepNumber: 4,
+            title: 'अंतिम टेस्टिंग और लंबी उम्र की देखभाल (Testing & Care)',
+            explanation: 'सभी कनेक्शन दोबारा जोड़ें और उपकरण को चालू करके 2 मिनट तक सामान्य संचालन की पुष्टि करें।',
+            actionTip: 'वस्तु को सीधी धूप और अत्यधिक नमी से दूर रखें।',
+            caution: 'असामान्य गर्मी या गंध आने पर तुरंत प्लग निकालें।',
+          },
+        ],
+      });
+    } finally {
+      setIsLoading(false);
+      setActiveStepIdx(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status === 'REPAIR' && objectName) {
+      fetchPlan(objectName);
+    }
+    return () => {
+      stopSpeech();
+      setSpeakingStep(null);
+    };
+  }, [status, objectName, fetchPlan]);
+
+  // Read active step out loud
+  const speakStep = (step: RepairStepItem) => {
+    if (speakingStep === step.stepNumber) {
+      stopSpeech();
+      setSpeakingStep(null);
+      return;
     }
 
-    const lower = (name || '').toLowerCase();
-
-    if (lower.includes('coffee') || lower.includes('mug')) {
-      return [
-        {
-          stepNumber: 1,
-          titleHindi: 'दरार और हैंडल का निरीक्षण करें',
-          descHindi: 'मग की सतह और हैंडल के जोड़ पर बारीक क्रैक देखें। गर्म पेय पदार्थ डालने से पहले सुरक्षा सुनिश्चित करना आवश्यक है।',
-          imageEmoji: '☕',
-          tag: 'सुरक्षा जांच',
-        },
-        {
-          stepNumber: 2,
-          titleHindi: 'फूड-ग्रेड एपॉक्सी से जोड़ें',
-          descHindi: 'अलग हुए हैंडल पर उच्च गुणवत्ता वाला नॉन-टॉक्सिक फूड-सेफ सिरेमिक एडहेसिव लगाएं और 24 घंटे सूखने दें।',
-          imageEmoji: '🥣',
-          tag: 'मरम्मत विधि',
-        },
-        {
-          stepNumber: 3,
-          titleHindi: 'चमक लौटाएं और देखभाल करें',
-          descHindi: 'पुराने जिद्दी दागों को बेकिंग सोडा और गर्म पानी से हल्के हाथों से पोंछें। मग दोबारा नए जैसा चमकदार दिखेगा।',
-          imageEmoji: '✨',
-          tag: 'रखरखाव',
-        },
-      ];
-    }
-
-    if (lower.includes('watch')) {
-      return [
-        {
-          stepNumber: 1,
-          titleHindi: 'स्ट्रैप, पिन व लॉक जांचें',
-          descHindi: 'घड़ी के बेल्ट पिन और लॉकिंग मैकेनिज्म को देखें। धूल या पसीना जमने पर माइक्रोफाइबर कपड़े से हल्के हाथों साफ करें।',
-          imageEmoji: '⌚',
-          tag: 'हार्डवेयर चेक',
-        },
-        {
-          stepNumber: 2,
-          titleHindi: 'सेंसर व स्क्रीन की सफाई',
-          descHindi: 'पीछे लगे ऑप्टिकल सेंसर को सूखे कपड़े से पोंछें ताकि पल्स और एक्टिविटी डेटा सटीक रिकॉर्ड हो सके।',
-          imageEmoji: '🪞',
-          tag: 'सेंसर ट्यूनिंग',
-        },
-        {
-          stepNumber: 3,
-          titleHindi: 'सॉफ्ट रीसेट और चार्जिंग',
-          descHindi: 'यदि स्क्रीन फ्रीज हो तो 10 सेकंड पावर बटन दबाकर रीस्टार्ट करें। चार्जर के मैग्नेटिक पॉइंट्स को साफ रखें।',
-          imageEmoji: '🔋',
-          tag: 'सिस्टम रीसेट',
-        },
-      ];
-    }
-
-    return [
-      {
-        stepNumber: 1,
-        titleHindi: 'खराबी या टूट-फूट की पहचान',
-        descHindi: `${name || 'वस्तु'} के कमजोर हिस्से, सतह पर आई दरारें या ढीले पुर्जों को ध्यान से चिन्हित करें।`,
-        imageEmoji: '🛠️',
-        tag: 'पहचान',
-      },
-      {
-        stepNumber: 2,
-        titleHindi: 'उचित उपकरण और सामग्री का उपयोग',
-        descHindi: 'सामग्री के अनुकूल स्क्रू, सही चिपकने वाला पदार्थ या सफाई घोल का ही इस्तेमाल करें ताकि नुकसान न पहुंचे।',
-        imageEmoji: '🧰',
-        tag: 'समाधान',
-      },
-      {
-        stepNumber: 3,
-        titleHindi: 'मजबूती टेस्ट और लंबे समय तक सुरक्षा',
-        descHindi: 'मरम्मत के बाद हल्के दबाव के साथ टिकाऊपन जांचें। नियमित देखभाल से वस्तु सालों-साल चलती रहेगी।',
-        imageEmoji: '🌟',
-        tag: 'सत्यापन',
-      },
-    ];
-  };
-
-  const steps = getSteps(objectName);
-
-  // Track active slide on horizontal snap scroll
-  const handleScroll = () => {
-    if (!scrollRef.current) return;
-    const { scrollLeft, clientWidth } = scrollRef.current;
-    const index = Math.round(scrollLeft / (clientWidth * 0.72));
-    setActiveStep(Math.min(steps.length - 1, Math.max(0, index)));
-  };
-
-  const scrollToStep = (index: number) => {
-    if (!scrollRef.current) return;
-    const cardWidth = 310 + 16;
-    scrollRef.current.scrollTo({
-      left: index * cardWidth,
-      behavior: 'smooth',
+    setSpeakingStep(step.stepNumber);
+    const textToSpeak = `कदम ${step.stepNumber}: ${step.title}. ${step.explanation}. टिप: ${step.actionTip}. सावधानी: ${step.caution}`;
+    speakImmediate(textToSpeak, {
+      onEnd: () => setSpeakingStep(null),
+      onError: () => setSpeakingStep(null),
     });
-    setActiveStep(index);
   };
 
-  // Proper internet searches as requested by user (Google Search & YouTube guides)
-  const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(
-    'how to fix and repair ' + (objectName || 'household item') + ' hindi guide'
-  )}`;
+  const currentStep = planData?.steps?.[activeStepIdx];
+  const totalSteps = planData?.steps?.length || 4;
 
-  const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
-    'how to repair ' + (objectName || 'item') + ' at home'
+  const youtubeGuideUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+    'how to fix and repair ' + (objectName || 'item') + ' step by step guide hindi'
   )}`;
 
   return (
     <AnimatePresence>
       {status === 'REPAIR' && (
         <motion.div
-          key="repair-carousel-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-2xl flex flex-col justify-between py-6 px-4 [padding-top:max(1.5rem,env(safe-area-inset-top))] [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))] pointer-events-auto select-none"
+          key="repair-modal"
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+          className="fixed inset-0 z-50 pointer-events-auto bg-[#0A0C12]/96 text-white backdrop-blur-2xl flex flex-col justify-between overflow-hidden p-4 sm:p-6 [padding-top:max(1.25rem,env(safe-area-inset-top))] [padding-bottom:max(1.75rem,env(safe-area-inset-bottom))]"
         >
-          {/* Top Bar: Back, Clean Title, Progress Dots, Close */}
-          <div className="w-full max-w-md mx-auto flex flex-col gap-3">
-            <div className="flex items-center justify-between text-white">
-              <button
-                onClick={() => setStatus('TALKING')}
-                className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition flex items-center gap-1.5 text-xs font-medium"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>वापस</span>
-              </button>
+          {/* 1. Classical Developer Header */}
+          <header className="w-full flex items-center justify-between pb-3 border-b border-white/10">
+            <button
+              onClick={() => setStatus('TALKING')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-white/90 text-xs font-semibold transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>वापस (Back)</span>
+            </button>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/10 text-neutral-200 border border-white/15">
-                  {objectName || 'वस्तु'} • समाधान गाइड
-                </span>
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-[#FF9933]" />
+              <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                मास्टर रिपेयर और समाधान गाइड
+              </h2>
+            </div>
+
+            <button
+              onClick={resetToIdle}
+              className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition"
+              aria-label="Close repair guide"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </header>
+
+          {/* 2. Loading State */}
+          {isLoading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-6">
+              <div className="relative w-16 h-16 rounded-full bg-gradient-to-tr from-[#FF671F]/30 via-white/10 to-[#046A38]/30 flex items-center justify-center border border-white/20 animate-pulse">
+                <Sparkles className="w-8 h-8 text-[#FF9933] animate-spin" />
               </div>
-
-              <button
-                onClick={resetToIdle}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition text-white/80 hover:text-white"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <h3 className="text-base font-bold text-white">
+                समाधान योजना तैयार हो रही है...
+              </h3>
+              <p className="text-xs text-white/60 max-w-xs leading-relaxed">
+                30B रीजनिंग मॉडल {objectName} के लिए शास्त्रीय और सुरक्षित कदम तैयार कर रहा है।
+              </p>
             </div>
+          )}
 
-            {/* Top 3 dots progress indicator */}
-            <div className="flex items-center justify-center gap-2 pt-1">
-              {steps.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => scrollToStep(idx)}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    activeStep === idx
-                      ? 'w-7 bg-gradient-to-r from-[#FF671F] via-[#FF9933] to-[#046A38]'
-                      : 'w-2 bg-white/30 hover:bg-white/50'
-                  }`}
-                  aria-label={`Go to step ${idx + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Middle: Horizontal Snap Scroll Cards */}
-          <div
-            ref={scrollRef}
-            onScroll={handleScroll}
-            className="w-full max-w-md mx-auto flex gap-4 overflow-x-auto snap-x snap-mandatory py-4 no-scrollbar items-center px-4"
-          >
-            {steps.map((step, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ scale: 0.96, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: idx * 0.1, duration: 0.3 }}
-                className="w-[82vw] max-w-[310px] h-[360px] rounded-[24px] bg-[#16181F] p-6 snap-center shrink-0 shadow-2xl flex flex-col justify-between border border-white/10 text-left select-text"
-              >
-                {/* Card Top: Step Pill & Tag */}
+          {/* 3. Main Classical Solution Card Content */}
+          {!isLoading && planData && (
+            <div className="flex-1 overflow-y-auto no-scrollbar py-3 flex flex-col gap-3.5 max-w-lg mx-auto w-full">
+              {/* Overview & Metadata Glass Pill */}
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 shadow-sm flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 rounded-full bg-white/10 text-white text-[11px] font-bold tracking-wide border border-white/10">
-                    चरण {step.stepNumber}
-                  </span>
-                  <span className="text-[11px] font-medium text-[#FF9933] bg-[#FF671F]/15 px-2.5 py-0.5 rounded-full border border-[#FF671F]/25">
-                    {step.tag}
+                  <h3 className="text-lg font-black text-white tracking-tight">
+                    {planData.objectName}
+                  </h3>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    सत्यापित कारीगर योजना
                   </span>
                 </div>
 
-                {/* Card Center Visual */}
-                <div className="my-auto flex flex-col items-center justify-center py-2">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-[#FF671F]/15 via-white/5 to-[#046A38]/15 border border-white/10 flex items-center justify-center text-4xl shadow-inner">
-                    <span>{step.imageEmoji}</span>
+                <p className="text-xs text-white/80 font-hindi leading-relaxed">
+                  {planData.summaryHindi}
+                </p>
+
+                {/* Quick Stats Badges */}
+                <div className="flex items-center gap-3 pt-1 text-[11px] text-white/70 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-[#FF9933]" />
+                    <span>समय: {planData.estimatedTime}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>कठिनाई: {planData.difficulty}</span>
                   </div>
                 </div>
 
-                {/* Card Content: Hindi Text with 1.6 Line-Height */}
-                <div className="flex flex-col gap-1.5">
-                  <h4 className="text-base font-bold text-white leading-snug font-hindi">
-                    {step.titleHindi}
-                  </h4>
-                  <p className="text-xs leading-[1.65] text-neutral-300 font-hindi">
-                    {step.descHindi}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                {/* Tools Chips */}
+                {planData.toolsRequired && planData.toolsRequired.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    <span className="text-[10px] text-white/50">आवश्यक सामग्री:</span>
+                    {planData.toolsRequired.map((tool, i) => (
+                      <span
+                        key={i}
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/15"
+                      >
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-          {/* Bottom: Proper Internet Search actions (Google & YouTube) */}
-          <div className="w-full max-w-md mx-auto flex flex-col gap-2.5">
-            {/* Primary: Google Internet Search */}
+              {/* Step Selector Tabs (Smooth pill switcher) */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10">
+                {planData.steps.map((step, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveStepIdx(idx)}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                      activeStepIdx === idx
+                        ? 'bg-gradient-to-r from-[#FF671F] to-[#046A38] text-white shadow-md'
+                        : 'text-white/60 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    कदम {idx + 1}
+                  </button>
+                ))}
+              </div>
+
+              {/* Active Classical Step Card */}
+              {currentStep && (
+                <motion.div
+                  key={currentStep.stepNumber}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex-1 p-5 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 border border-white/15 shadow-xl flex flex-col justify-between gap-3.5"
+                >
+                  <div className="flex flex-col gap-2.5">
+                    {/* Step Number + Audio Speaker */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white/15 text-white/90 border border-white/20">
+                        कदम {currentStep.stepNumber} / {totalSteps}
+                      </span>
+
+                      <button
+                        onClick={() => speakStep(currentStep)}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition ${
+                          speakingStep === currentStep.stepNumber
+                            ? 'bg-[#FF671F] text-white animate-pulse'
+                            : 'bg-white/10 hover:bg-white/20 text-white/90 border border-white/15'
+                        }`}
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span>
+                          {speakingStep === currentStep.stepNumber ? 'रुकें' : 'यह कदम सुनें'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Step Title */}
+                    <h4 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                      {currentStep.title}
+                    </h4>
+
+                    {/* Step Detailed Explanation */}
+                    <p className="text-xs sm:text-sm text-neutral-200 font-hindi leading-relaxed">
+                      {currentStep.explanation}
+                    </p>
+
+                    {/* Action Tip Box */}
+                    <div className="mt-1 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold text-emerald-300">
+                          मुख्य व्यावहारिक कदम (Action Tip)
+                        </span>
+                        <span className="text-xs text-emerald-100/90 font-hindi leading-normal">
+                          {currentStep.actionTip}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Caution Box */}
+                    {currentStep.caution && (
+                      <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 flex items-start gap-2.5">
+                        <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-bold text-amber-300">
+                            सुरक्षा सावधानी (Caution)
+                          </span>
+                          <span className="text-xs text-amber-100/90 font-hindi leading-normal">
+                            {currentStep.caution}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step Navigation Bar */}
+                  <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                    <button
+                      onClick={() => setActiveStepIdx((prev) => Math.max(0, prev - 1))}
+                      disabled={activeStepIdx === 0}
+                      className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                        activeStepIdx === 0
+                          ? 'opacity-30 cursor-not-allowed text-white/40'
+                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>पिछला कदम</span>
+                    </button>
+
+                    {activeStepIdx < totalSteps - 1 ? (
+                      <button
+                        onClick={() => setActiveStepIdx((prev) => Math.min(totalSteps - 1, prev + 1))}
+                        className="flex items-center gap-1 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF671F] to-[#046A38] text-white text-xs font-bold shadow-md hover:opacity-95 active:scale-95 transition"
+                      >
+                        <span>अगला कदम</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={resetToIdle}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-md hover:bg-emerald-500 active:scale-95 transition"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>समाधान पूरा हुआ • Done</span>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
+
+          {/* 4. Bottom Classical External Help Link */}
+          <footer className="w-full pt-2 border-t border-white/10 flex items-center justify-between text-xs text-white/60">
+            <span className="text-[11px]">BOLO Bharat Classical Repair Assistant</span>
             <a
-              href={googleSearchUrl}
+              href={youtubeGuideUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full h-13 py-3.5 px-5 rounded-full bg-gradient-to-r from-[#FF671F] via-[#FF8833] to-[#046A38] hover:opacity-95 active:scale-[0.98] text-white font-semibold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition"
+              className="flex items-center gap-1 text-[#FF9933] hover:underline text-[11px] font-semibold"
             >
-              <Search className="w-4 h-4" />
-              <span>इंटरनेट पर समाधान खोजें (Search on Google)</span>
-              <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              <span>YouTube पर वीडियो गाइड देखें</span>
+              <ExternalLink className="w-3 h-3" />
             </a>
-
-            {/* Secondary: YouTube video repair guide */}
-            <a
-              href={youtubeSearchUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-xs font-medium flex items-center justify-center gap-2 transition"
-            >
-              <Video className="w-4 h-4 text-red-500" />
-              <span>वीडियो गाइड देखें (Watch Video Guides)</span>
-            </a>
-
-            {/* Return action */}
-            <button
-              onClick={() => setStatus('TALKING')}
-              className="w-full py-2 text-xs font-medium text-neutral-400 hover:text-white transition flex items-center justify-center gap-1.5"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>समाधान पूरा हुआ • वापस बोलें</span>
-            </button>
-          </div>
+          </footer>
         </motion.div>
       )}
     </AnimatePresence>

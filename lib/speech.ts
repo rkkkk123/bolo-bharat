@@ -1,6 +1,6 @@
 /**
  * Web Speech Synthesis Engine for BOLO
- * Immediate, high-clarity voice output in Hindi / Hinglish.
+ * High-clarity voice output in Hindi / Hinglish with iOS Safari unlock.
  */
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
@@ -14,12 +14,18 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 }
 
 /**
- * Prime audio context / speech synthesizer during direct user interaction
+ * Prime audio context / speech synthesizer during direct user touch/click interaction.
+ * Crucial for iOS Safari which requires an active audio unlock during user gesture.
  */
 export function primeSpeechSynthesis() {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.resume();
+    // Silent single-character utterance unlocks iOS audio session
+    const unlockUtterance = new SpeechSynthesisUtterance(' ');
+    unlockUtterance.volume = 0.01;
+    unlockUtterance.rate = 1.0;
+    window.speechSynthesis.speak(unlockUtterance);
   } catch {}
 }
 
@@ -34,11 +40,14 @@ export function speakImmediate(
     onError?: (err: unknown) => void;
   }
 ) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
+  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) {
+    callbacks?.onEnd?.();
+    return;
+  }
 
   try {
     const synth = window.speechSynthesis;
-    synth.cancel(); // Stop any previous speech
+    synth.cancel(); // Stop any previous ongoing speech
     synth.resume(); // Ensure synthesizer is unpaused
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -64,7 +73,7 @@ export function speakImmediate(
     }
 
     utterance.rate = 1.0;
-    utterance.pitch = 1.05;
+    utterance.pitch = 1.0;
 
     utterance.onstart = () => {
       callbacks?.onStart?.();
@@ -75,7 +84,7 @@ export function speakImmediate(
     };
 
     utterance.onerror = (e) => {
-      console.warn('[BOLO Speech Error]', e);
+      console.warn('[BOLO Speech Warning]', e);
       callbacks?.onEnd?.();
       callbacks?.onError?.(e);
     };

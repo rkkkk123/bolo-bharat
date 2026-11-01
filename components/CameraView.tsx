@@ -34,40 +34,62 @@ export const CameraView: React.FC<CameraViewProps> = ({ onTap, children }) => {
       const pixelX = e.clientX - rect.left;
       const pixelY = e.clientY - rect.top;
 
-      // Percentage coordinates (0 - 100)
-      const pctX = Math.round((pixelX / rect.width) * 100);
-      const pctY = Math.round((pixelY / rect.height) * 100);
+      // Percentage coordinates (0 - 100) relative to container viewport
+      const viewportPctX = Math.round((pixelX / rect.width) * 100);
+      const viewportPctY = Math.round((pixelY / rect.height) * 100);
 
       // Call store & set state to GROUNDING
-      setTapPoint({ x: pctX, y: pctY });
+      setTapPoint({ x: viewportPctX, y: viewportPctY });
       setStatus('GROUNDING');
       primeSpeechSynthesis();
 
-      // Add TapRipple
+      // Add TapRipple at visual touch position
       const rippleId = Date.now();
       setRipples((prev) => [...prev.slice(-3), { id: rippleId, pixelX, pixelY }]);
 
-      // Capture frame from active video element
+      // Capture frame from active video element with precise object-cover coordinate mapping
       let capturedFrameBase64 = '';
+      let modelPctX = viewportPctX;
+      let modelPctY = viewportPctY;
+
       if (videoRef.current && isActive && videoRef.current.videoWidth > 0) {
         try {
           const video = videoRef.current;
+          const vWidth = video.videoWidth;
+          const vHeight = video.videoHeight;
+          const boxWidth = rect.width;
+          const boxHeight = rect.height;
+
+          // Compute object-cover scale and centering offsets
+          const scale = Math.max(boxWidth / vWidth, boxHeight / vHeight);
+          const renderedWidth = vWidth * scale;
+          const renderedHeight = vHeight * scale;
+          const offsetX = (renderedWidth - boxWidth) / 2;
+          const offsetY = (renderedHeight - boxHeight) / 2;
+
+          // Convert screen tap coordinates into exact video pixel coordinates
+          const videoPixelX = (pixelX + offsetX) / scale;
+          const videoPixelY = (pixelY + offsetY) / scale;
+
+          modelPctX = Math.round(Math.max(0, Math.min(100, (videoPixelX / vWidth) * 100)));
+          modelPctY = Math.round(Math.max(0, Math.min(100, (videoPixelY / vHeight) * 100)));
+
           const canvas = document.createElement('canvas');
-          canvas.width = Math.min(800, video.videoWidth);
-          canvas.height = Math.min(800, video.videoHeight);
+          canvas.width = Math.min(800, vWidth);
+          canvas.height = Math.min(800, vHeight);
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            capturedFrameBase64 = canvas.toDataURL('image/jpeg', 0.8);
+            capturedFrameBase64 = canvas.toDataURL('image/jpeg', 0.85);
           }
         } catch (captureErr) {
           console.warn('[BOLO Frame Capture Warning]', captureErr);
         }
       }
 
-      // Notify parent if provided
+      // Notify parent with calibrated coordinates and frame
       if (onTap) {
-        onTap({ x: pctX, y: pctY }, capturedFrameBase64);
+        onTap({ x: modelPctX, y: modelPctY }, capturedFrameBase64);
       }
     },
     [setTapPoint, setStatus, onTap, videoRef, isActive]

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useBoloStore } from '@/store/useBoloStore';
 import { talkAsObject } from '@/lib/fireworks';
 import { speakImmediate, stopSpeech } from '@/lib/speech';
-import { Wrench, Volume2, X } from 'lucide-react';
+import { Wrench, Volume2, X, Sparkles } from 'lucide-react';
 
 export const TalkingSheet: React.FC = () => {
   const {
@@ -23,7 +23,7 @@ export const TalkingSheet: React.FC = () => {
   const [displayedLength, setDisplayedLength] = useState<number>(0);
   const [fullText, setFullText] = useState<string>('');
 
-  // Fetch Hindi response from /lib/fireworks.ts
+  // Fetch Hindi response
   const fetchDialogue = useCallback(async (objName: string) => {
     setIsLoadingDialogue(true);
     setDisplayedLength(0);
@@ -34,7 +34,7 @@ export const TalkingSheet: React.FC = () => {
         setFullText(response.hindiTranscript);
       }
     } catch {
-      const fallback = `नमस्ते! मैं आपका ${objName} हूँ। आज आपकी क्या मदद कर सकता हूँ?`;
+      const fallback = `नमस्ते! मैं आपका ${objName} हूँ। मैं आपकी रोज़मर्रा की ज़िंदगी में आपकी मदद के लिए तैयार हूँ।`;
       setTranscript(fallback, fallback);
       setFullText(fallback);
     } finally {
@@ -58,7 +58,7 @@ export const TalkingSheet: React.FC = () => {
     }
   }, [status, objectName, transcript, fetchDialogue, setIsTalking]);
 
-  // Smooth Indic-compatible typewriter animation without breaking Devanagari matras
+  // Smooth Indic typewriter animation
   useEffect(() => {
     if (!fullText) return;
     setDisplayedLength(0);
@@ -72,12 +72,12 @@ export const TalkingSheet: React.FC = () => {
       } else {
         setDisplayedLength(current);
       }
-    }, 35);
+    }, 30);
 
     return () => clearInterval(interval);
   }, [fullText]);
 
-  // Voice speech synthesis using robust voice engine
+  // Voice speech synthesis
   const triggerVoice = useCallback(
     (textToSpeak: string) => {
       speakImmediate(textToSpeak, {
@@ -99,14 +99,20 @@ export const TalkingSheet: React.FC = () => {
   }, [status, fullText, isLoadingDialogue, triggerVoice]);
 
   const getObjectEmoji = (name?: string | null) => {
-    if (!name) return '📦';
+    if (!name) return '✨';
     const lower = name.toLowerCase();
-    if (lower.includes('coffee') || lower.includes('mug')) return '☕';
-    if (lower.includes('watch')) return '⌚';
-    if (lower.includes('plant')) return '🪴';
-    if (lower.includes('book') || lower.includes('notebook')) return '📖';
-    if (lower.includes('phone')) return '📱';
-    return '📦';
+    if (lower.includes('laptop') || lower.includes('screen') || lower.includes('monitor')) return '💻';
+    if (lower.includes('keyboard') || lower.includes('mouse')) return '⌨️';
+    if (lower.includes('coffee') || lower.includes('mug') || lower.includes('cup')) return '☕';
+    if (lower.includes('watch') || lower.includes('clock')) return '⌚';
+    if (lower.includes('plant') || lower.includes('flower') || lower.includes('leaf')) return '🌿';
+    if (lower.includes('book') || lower.includes('notebook') || lower.includes('diary')) return '📖';
+    if (lower.includes('phone') || lower.includes('mobile')) return '📱';
+    if (lower.includes('lamp') || lower.includes('light') || lower.includes('bulb')) return '💡';
+    if (lower.includes('fan')) return '🪭';
+    if (lower.includes('bottle') || lower.includes('water')) return '🍶';
+    if (lower.includes('pen') || lower.includes('pencil')) return '✏️';
+    return '✨';
   };
 
   return (
@@ -114,13 +120,13 @@ export const TalkingSheet: React.FC = () => {
       {status === 'TALKING' && (
         <motion.div
           key="talking-sheet"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
           transition={{
             type: 'spring',
-            stiffness: 300,
-            damping: 30,
+            stiffness: 340,
+            damping: 32,
           }}
           drag="y"
           dragConstraints={{ top: 0 }}
@@ -130,26 +136,27 @@ export const TalkingSheet: React.FC = () => {
               resetToIdle();
             }
           }}
-          className="fixed inset-x-0 bottom-0 z-50 pointer-events-auto rounded-t-[32px] bg-white/95 dark:bg-[#12141A]/95 backdrop-blur-2xl shadow-[0_-16px_48px_rgba(0,0,0,0.2)] p-5 pb-8 sm:p-6 sm:pb-8 flex flex-col gap-3.5 sm:gap-4 max-w-md mx-auto border-t border-black/5 dark:border-white/10 [padding-bottom:max(2rem,env(safe-area-inset-bottom))]"
+          className="fixed inset-x-0 bottom-0 z-50 pointer-events-auto rounded-t-[36px] bg-[#10121A]/95 dark:bg-[#0B0D14]/95 text-white backdrop-blur-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.5)] p-5 pb-7 sm:p-6 sm:pb-8 flex flex-col gap-4 max-w-md mx-auto border-t border-white/15 [padding-bottom:max(2rem,env(safe-area-inset-bottom))]"
         >
           {/* Centered Grab Handle */}
-          <div className="w-[40px] h-[4px] bg-neutral-300 dark:bg-neutral-700 rounded-full mx-auto cursor-grab active:cursor-grabbing mb-1" />
+          <div className="w-12 h-1 bg-white/25 rounded-full mx-auto cursor-grab active:cursor-grabbing mb-1" />
 
-          {/* Row 1: 40px avatar circle + objectName + green dot "bol raha hai" 12px */}
+          {/* Row 1: Classical Object Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#FF671F]/20 via-white/10 to-[#046A38]/20 border border-white/20 flex items-center justify-center text-xl shadow-sm">
+              {/* 3D Glass Avatar with Tricolor Rim */}
+              <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-[#FF671F]/30 via-white/20 to-[#046A38]/30 border border-white/30 flex items-center justify-center text-2xl shadow-lg backdrop-blur-md">
                 <span>{getObjectEmoji(objectName)}</span>
               </div>
 
               <div className="flex flex-col">
-                <h3 className="text-base font-bold text-[#0A0A0A] dark:text-white leading-tight tracking-tight">
-                  {objectName || 'वस्तु'}
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                  {objectName || 'पहचाना गया सामान'}
                 </h3>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping" />
                   <span className="text-[12px] font-semibold text-[#10B981]">
-                    bol raha hai
+                    लाइव आवाज़ • Bol raha hai
                   </span>
                 </div>
               </div>
@@ -157,22 +164,22 @@ export const TalkingSheet: React.FC = () => {
 
             <button
               onClick={resetToIdle}
-              className="p-2 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+              className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition"
               aria-label="Dismiss sheet"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Row 2: Devanagari Transcript - generous padding, zero left clipping, font-hindi 16px 1.6 */}
-          <div className="min-h-[80px] w-full px-5 py-4 rounded-2xl bg-neutral-100/70 dark:bg-neutral-900/70 border border-black/5 dark:border-white/5 flex items-center overflow-hidden">
+          {/* Row 2: Classical Speech Transcript Box */}
+          <div className="min-h-[88px] w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center shadow-inner">
             {isLoadingDialogue ? (
-              <div className="flex items-center gap-2 text-neutral-400 text-sm">
-                <span className="w-2 h-2 rounded-full bg-[#FF671F] animate-ping" />
+              <div className="flex items-center gap-2 text-white/60 text-sm">
+                <Sparkles className="w-4 h-4 text-[#FF9933] animate-spin" />
                 <span>सोच रहा है... (Thinking...)</span>
               </div>
             ) : (
-              <p className="w-full text-[16px] leading-[1.65] text-[#0A0A0A] dark:text-neutral-100 font-hindi select-text break-words">
+              <p className="w-full text-[15px] sm:text-[16px] leading-[1.65] text-white font-hindi select-text break-words">
                 {fullText.slice(0, displayedLength)}
                 {displayedLength < fullText.length && (
                   <span className="inline-block w-1.5 h-4 ml-1 bg-[#FF671F] animate-pulse align-middle" />
@@ -181,42 +188,48 @@ export const TalkingSheet: React.FC = () => {
             )}
           </div>
 
-          {/* Row 3: Waveform animation when isTalking true - 5 bars animating height */}
+          {/* Row 3: 5-Bar Dancing Equalizer Waveform */}
           <div className="h-6 flex items-center justify-center gap-1.5 py-1">
             {isTalking ? (
-              [8, 22, 14, 26, 10].map((_, idx) => (
+              [10, 24, 16, 28, 12].map((_, idx) => (
                 <motion.div
                   key={idx}
                   animate={{
-                    scaleY: [0.35, 1.25, 0.35],
+                    scaleY: [0.35, 1.3, 0.35],
                   }}
                   transition={{
                     repeat: Infinity,
-                    duration: 0.7 + (idx % 3) * 0.18,
+                    duration: 0.65 + (idx % 3) * 0.16,
                     ease: 'easeInOut',
                   }}
                   className="w-1.5 bg-gradient-to-t from-[#FF671F] via-[#FF9933] to-[#046A38] rounded-full h-full origin-bottom"
                 />
               ))
             ) : (
-              <div className="flex items-center gap-1.5 text-xs text-neutral-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                <span>बात पूरी हुई (Tap to Replay)</span>
+              <div className="flex items-center gap-1.5 text-xs text-white/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>बात पूरी हुई (Tap Replay to listen again)</span>
               </div>
             )}
           </div>
 
-          {/* Row 4: Clean Action Pills without double icons */}
+          {/* Row 4: Classical Developer Action Pills */}
           <div className="flex items-center gap-3 pt-1">
-            <button
+            {/* Fix Karo CTA Button */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setStatus('REPAIR')}
-              className="flex-1 h-12 px-5 rounded-full bg-black text-white hover:bg-neutral-800 active:scale-[0.98] transition font-semibold text-sm flex items-center justify-center gap-2 shadow-sm border border-white/10"
+              className="flex-1 h-13 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#FF671F] via-[#FF8526] to-[#046A38] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(255,103,31,0.35)] border border-white/25 active:scale-95 transition cursor-pointer"
             >
-              <Wrench className="w-4 h-4 text-[#FF9933]" />
-              <span>Fix karo</span>
-            </button>
+              <Wrench className="w-4 h-4 text-white" />
+              <span>Fix karo • समाधान</span>
+            </motion.button>
 
-            <button
+            {/* Phir Bolo Replay Button */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => {
                 if (fullText) {
                   triggerVoice(fullText);
@@ -224,11 +237,11 @@ export const TalkingSheet: React.FC = () => {
                   fetchDialogue(objectName);
                 }
               }}
-              className="flex-1 h-12 px-5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-black dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-[0.98] transition font-semibold text-sm flex items-center justify-center gap-2 border border-black/5 dark:border-white/5"
+              className="flex-1 h-13 py-3.5 px-4 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm flex items-center justify-center gap-2 border border-white/20 active:scale-95 transition cursor-pointer"
             >
               <Volume2 className="w-4 h-4 text-[#0084FF]" />
-              <span>Phir bolo</span>
-            </button>
+              <span>Phir bolo • दोबारा सुनें</span>
+            </motion.button>
           </div>
         </motion.div>
       )}
