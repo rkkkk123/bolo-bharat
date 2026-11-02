@@ -163,7 +163,8 @@ Return ONLY valid JSON:
     ];
 
     const dialogueModelsToTry = [
-      MODELS.DIALOGUE,
+      MODELS.META_DIALOGUE_70B,
+      MODELS.META_DIALOGUE_8B,
       MODELS.DIALOGUE_FALLBACK,
     ];
 
@@ -196,11 +197,9 @@ Return ONLY valid JSON:
       dialogueData = parseDialogueJson('', label);
     }
 
-    const modelName = successfulDialogueModel.includes('minimax')
-      ? 'MiniMax M3 Flash'
-      : successfulDialogueModel.includes('maverick')
-      ? 'Meta Llama 4 Maverick'
-      : 'Fireworks AI Dialogue';
+    const modelName = successfulDialogueModel.includes('llama')
+      ? 'Meta Llama 3.3 70B'
+      : 'Meta Llama (Indic Voice Flash)';
 
     const response: TalkResponse = {
       success: true,

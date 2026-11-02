@@ -162,8 +162,8 @@ export const TalkingSheet: React.FC = () => {
                     लाइव आवाज़ • Bol raha hai
                   </span>
                   <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="text-[10px] font-medium text-white/50 px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
-                    Meta Llama 4
+                  <span className="text-[10px] font-semibold text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30">
+                    Meta Llama 3.3
                   </span>
                 </div>
               </div>

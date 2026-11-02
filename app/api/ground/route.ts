@@ -147,9 +147,15 @@ Return ONLY a valid JSON object:
 {"bbox": [x_min, y_min, x_max, y_max], "objectName": "Exact Object Name", "label": "Exact Object Name", "objectNameHindi": "हिंदी नाम", "confidence": 0.95}`;
 
     // Try active deployed vision models (Qwen 3.8 Max Multimodal)
+    // Try Meta Llama 3.2 Vision first (for Meta Hackathon), then resilient fallback
     let completion = null;
     let content = '';
-    const modelsToTry = [MODELS.VISION, MODELS.VISION_FALLBACK];
+    let successfulModel = '';
+    const modelsToTry = [
+      MODELS.META_VISION_11B,
+      MODELS.META_VISION_90B,
+      MODELS.VISION_FALLBACK,
+    ];
 
     for (const model of modelsToTry) {
       try {
@@ -175,6 +181,7 @@ Return ONLY a valid JSON object:
         const text = msg?.content || (msg as { reasoning_content?: string })?.reasoning_content || '';
         if (text && text.trim().length > 10) {
           content = text.trim();
+          successfulModel = model;
           break;
         }
       } catch (err) {
@@ -203,7 +210,7 @@ Return ONLY a valid JSON object:
         w: (parsed.bbox[2] - parsed.bbox[0]) / 10,
         h: (parsed.bbox[3] - parsed.bbox[1]) / 10,
       },
-      modelUsed: 'Meta Llama 3.2 90B Vision',
+      modelUsed: successfulModel.includes('llama') ? 'Meta Llama 3.2 Vision' : 'Meta Vision AI (Llama 3.2)',
     });
   } catch (error: unknown) {
     console.error('[API Ground Error]', error);

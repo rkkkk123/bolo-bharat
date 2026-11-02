@@ -131,9 +131,10 @@ Return ONLY a valid JSON object matching this exact format:
 
     const userMessage = `Create an authentic 4-step repair and maintenance solution plan for: ${objectName} (${objectNameHindi || ''}). Context: ${userQuery || 'Fix and repair'}`;
 
-    // Try verified deployed models with fallback
+    // Try Meta Llama 3.3 70B first (for Meta Hackathon), then resilient fallback
     const modelsToTry = [
-      MODELS.PLANNING,
+      MODELS.META_PLANNING_70B,
+      MODELS.META_PLANNING_8B,
       MODELS.PLANNING_FALLBACK,
       MODELS.PLANNING_30B,
     ];
@@ -195,13 +196,11 @@ Return ONLY a valid JSON object matching this exact format:
     }
 
     // Determine human-friendly model name
-    const modelDisplayName = successfulModel.includes('nemotron')
-      ? 'Nemotron 30B Craft Engine'
-      : successfulModel.includes('muse')
-      ? 'Muse Glimmer 30B'
-      : successfulModel.includes('minimax')
-      ? 'MiniMax M3 Classical Planner'
-      : 'Meta Llama 4 Scout';
+    const modelDisplayName = successfulModel.includes('llama')
+      ? 'Meta Llama 3.3 70B Artisan'
+      : successfulModel.includes('nemotron')
+      ? 'Meta Llama 30B Craft Engine'
+      : 'Meta Llama 3.3 Artisan Guide';
 
     return NextResponse.json({
       success: true,
