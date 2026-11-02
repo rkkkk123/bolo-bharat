@@ -14,10 +14,10 @@ export const Halo: React.FC<HaloProps> = ({ bbox, isActive, objectName }) => {
   if (!isActive || !bbox) return null;
 
   // Clamped coordinates to guarantee it never renders off-screen
-  const safeX = Math.max(4, Math.min(68, bbox.x));
-  const safeY = Math.max(6, Math.min(62, bbox.y));
-  const safeW = Math.max(20, Math.min(50, bbox.w));
-  const safeH = Math.max(20, Math.min(50, bbox.h));
+  const safeX = Math.max(1, Math.min(94, bbox.x));
+  const safeY = Math.max(1, Math.min(94, bbox.y));
+  const safeW = Math.max(6, Math.min(100 - safeX, bbox.w));
+  const safeH = Math.max(6, Math.min(100 - safeY, bbox.h));
 
   return (
     <AnimatePresence>

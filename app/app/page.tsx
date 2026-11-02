@@ -103,6 +103,62 @@ export default function BoloMainExperience() {
     [setBbox, setObjectName, setStatus, setRepairSteps, setIsTalking, groundingSuccess, groundingFailed]
   );
 
+  // Integrated Dragged Box Selection -> Crop -> Ground -> Persona Talk & Step-by-Step Solutions
+  const handleBoxSelect = useCallback(
+    async (
+      selectedBbox: { x: number; y: number; w: number; h: number },
+      fullImageBase64?: string,
+      croppedImageBase64?: string
+    ) => {
+      try {
+        primeSpeechSynthesis();
+        setStatus('GROUNDING');
+
+        // Immediately set bounding box to user's precise selection so Halo reflects it
+        setBbox(selectedBbox);
+
+        // Center coordinates of user's box in 0-100 scale
+        const centerX = Math.round(selectedBbox.x + selectedBbox.w / 2);
+        const centerY = Math.round(selectedBbox.y + selectedBbox.h / 2);
+
+        // 1. Identify object inside the user's selected box
+        const groundRes = await groundObject(fullImageBase64 || '', centerX, centerY);
+        const objectLabel = groundRes.objectName || groundRes.label || 'चिन्हित वस्तु';
+        setObjectName(objectLabel);
+
+        // 2. Obtain sub-image crop of the selected box
+        const cropped =
+          croppedImageBase64 || (await cropImageFromBbox(fullImageBase64 || '', selectedBbox));
+
+        // 3. Multimodal dialogue & step-by-step repair plan generation
+        const talkRes = await talkAsObject(cropped, objectLabel);
+
+        if (talkRes.repairSteps && talkRes.repairSteps.length > 0) {
+          setRepairSteps(talkRes.repairSteps);
+        }
+
+        // Speak persona voice out loud
+        speakImmediate(talkRes.talk, {
+          onStart: () => setIsTalking(true),
+          onEnd: () => setIsTalking(false),
+        });
+
+        // Set state to TALKING
+        groundingSuccess({
+          bbox: selectedBbox,
+          objectName: objectLabel,
+          hindiTranscript: talkRes.talk,
+          englishTranscript: talkRes.englishTranscript,
+        });
+      } catch (err) {
+        console.warn('[BOLO Box Selection Error]', err);
+        showToast('Phir se select karo (फिर से बॉक्स खींचें)');
+        groundingFailed('Selection failed');
+      }
+    },
+    [setBbox, setObjectName, setStatus, setRepairSteps, setIsTalking, groundingSuccess, groundingFailed]
+  );
+
   // Status label generator for calm header
   const getStatusText = () => {
     switch (status) {
@@ -170,7 +226,7 @@ export default function BoloMainExperience() {
 
         {/* Viewport: CameraView with edge-to-edge mobile expansion */}
         <div className="flex-1 w-full min-h-0 relative flex flex-col p-0 md:p-2.5">
-          <CameraView onTap={handleCameraTap}>
+          <CameraView onTap={handleCameraTap} onBoxSelect={handleBoxSelect}>
             <Halo
               bbox={bbox}
               isActive={status === 'TALKING' || status === 'REPAIR'}

@@ -220,8 +220,31 @@ export const TalkingSheet: React.FC = () => {
             )}
           </div>
 
-          {/* Row 4: Classical Developer Action Pills */}
-          <div className="flex items-center gap-3 pt-1">
+          {/* Row 4: Step-by-Step Solutions Ready Banner */}
+          <div
+            onClick={() => setStatus('REPAIR')}
+            className="w-full p-3 rounded-2xl bg-gradient-to-r from-[#FF671F]/15 via-white/5 to-[#046A38]/15 border border-white/15 flex items-center justify-between cursor-pointer hover:border-white/30 transition shadow-inner active:scale-98"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF671F] to-[#046A38] flex items-center justify-center shrink-0 shadow-sm">
+                <Wrench className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold text-white truncate">
+                  समाधान चरण-दर-चरण उपलब्ध है
+                </span>
+                <span className="text-[11px] text-white/60">
+                  एक-एक करके समाधान के 4 कदम देखें →
+                </span>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/30 px-2.5 py-1 rounded-full shrink-0">
+              कदम 1 से 4
+            </span>
+          </div>
+
+          {/* Row 5: Action Pills */}
+          <div className="flex items-center gap-3 pt-0.5">
             {/* Fix Karo CTA Button */}
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -230,7 +253,7 @@ export const TalkingSheet: React.FC = () => {
               className="flex-1 h-13 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#FF671F] via-[#FF8526] to-[#046A38] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(255,103,31,0.35)] border border-white/25 active:scale-95 transition cursor-pointer"
             >
               <Wrench className="w-4 h-4 text-white" />
-              <span>Fix karo • समाधान</span>
+              <span>Fix karo • समाधान (1 by 1)</span>
             </motion.button>
 
             {/* Phir Bolo Replay Button */}
