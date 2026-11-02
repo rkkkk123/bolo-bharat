@@ -165,7 +165,6 @@ Return ONLY valid JSON:
     const dialogueModelsToTry = [
       MODELS.DIALOGUE,
       MODELS.DIALOGUE_FALLBACK,
-      MODELS.META_DIALOGUE,
     ];
 
     let dialogueData: { talk: string; talkEnglish: string; repairSteps: string[]; shopLink?: string } | null = null;

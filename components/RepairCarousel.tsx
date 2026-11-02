@@ -157,10 +157,10 @@ export const RepairCarousel: React.FC = () => {
               <span>वापस (Back)</span>
             </button>
 
-            <div className="flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-[#FF9933]" />
-              <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                मास्टर रिपेयर और समाधान गाइड
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Wrench className="w-4 h-4 text-[#FF9933] shrink-0" />
+              <h2 className="text-xs sm:text-base font-bold text-white tracking-tight truncate max-w-[150px] sm:max-w-none">
+                समाधान गाइड • Repair Guide
               </h2>
             </div>
 

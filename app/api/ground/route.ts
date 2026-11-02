@@ -146,11 +146,10 @@ TASK:
 Return ONLY a valid JSON object:
 {"bbox": [x_min, y_min, x_max, y_max], "objectName": "Exact Object Name", "label": "Exact Object Name", "objectNameHindi": "हिंदी नाम", "confidence": 0.95}`;
 
-    // Try 90B first, fall back to 11B
-    // Try primary vision model first, then fallbacks
+    // Try active deployed vision models (Qwen 3.8 Max Multimodal)
     let completion = null;
     let content = '';
-    const modelsToTry = [MODELS.VISION, MODELS.VISION_FALLBACK, MODELS.META_VISION];
+    const modelsToTry = [MODELS.VISION, MODELS.VISION_FALLBACK];
 
     for (const model of modelsToTry) {
       try {

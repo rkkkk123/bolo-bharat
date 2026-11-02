@@ -131,12 +131,11 @@ Return ONLY a valid JSON object matching this exact format:
 
     const userMessage = `Create an authentic 4-step repair and maintenance solution plan for: ${objectName} (${objectNameHindi || ''}). Context: ${userQuery || 'Fix and repair'}`;
 
-    // Try deployed models with fallback
+    // Try verified deployed models with fallback
     const modelsToTry = [
       MODELS.PLANNING,
+      MODELS.PLANNING_FALLBACK,
       MODELS.PLANNING_30B,
-      MODELS.PLANNING_MUSE,
-      MODELS.META_PLANNING,
     ];
     let completion = null;
     let successfulModel = '';

@@ -16,14 +16,14 @@ export const Orb: React.FC<OrbProps> = ({ onClick }) => {
   const isListeningOrTalking = status === 'TALKING' || isTalking;
 
   return (
-    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center justify-center pointer-events-auto select-none">
+    <div className="absolute left-1/2 -translate-x-1/2 z-40 flex flex-col items-center justify-center pointer-events-auto select-none [bottom:max(1.5rem,calc(env(safe-area-inset-bottom)+0.75rem))]">
       {/* Waveform visualizer above orb during listening/talking state */}
       {isListeningOrTalking && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          className="mb-3 flex items-center justify-center gap-1.5 h-6 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg"
+          className="mb-3 flex items-center justify-center gap-1.5 h-6 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-xl"
         >
           {[10, 20, 14, 24, 12, 22, 16].map((_, idx) => (
             <motion.div
@@ -42,13 +42,15 @@ export const Orb: React.FC<OrbProps> = ({ onClick }) => {
         </motion.div>
       )}
 
-      {/* Tricolor Wave Orb (68px) */}
-      <TricolorOrb
-        size={68}
-        isPulsing={isGrounding || isListeningOrTalking}
-        onClick={onClick}
-        showAura={true}
-      />
+      {/* Tricolor Wave Action Orb (68px) with safe accessible touch */}
+      <div className="relative p-1">
+        <TricolorOrb
+          size={68}
+          isPulsing={isGrounding || isListeningOrTalking}
+          onClick={onClick}
+          showAura={true}
+        />
+      </div>
     </div>
   );
 };

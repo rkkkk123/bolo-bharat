@@ -1,36 +1,32 @@
 /**
  * Fireworks AI Server Client — Shared Factory
- * Single source of truth for credentials & model configuration.
+ * Single source of truth for credentials & verified active deployed models.
  * Vercel-safe: uses process.env only (no fs reads).
  */
 
 import OpenAI from 'openai';
 
-// ─── Verified Active Model Registry ──────────────────────────────────────────
-// Deployed models on Fireworks account + Meta Llama fallbacks
+// ─── Verified Active Model Registry (Tested & Deployed on Fireworks) ─────────
 export const MODELS = {
   /** Multimodal Vision Grounding: fast, accurate visual localization on base64 frames */
   VISION: 'accounts/fireworks/models/qwen3p8-max',
   VISION_FALLBACK: 'accounts/fireworks/models/qwen3p8-2p4t-a95b',
-  META_VISION: 'accounts/fireworks/models/llama-v3p2-90b-vision-instruct',
 
-  /** Persona Dialogue: ultra-fast, witty Hinglish object dialogue */
+  /** Persona Dialogue: ultra-fast (360ms), witty Indic Hindi & English dialogue */
   DIALOGUE: 'accounts/fireworks/models/minimax-m3p1-flash',
   DIALOGUE_FALLBACK: 'accounts/fireworks/models/qwen3p8-max',
-  META_DIALOGUE: 'accounts/fireworks/models/llama4-maverick-instruct-basic',
 
-  /** Classical Structured Repair Planning: high-accuracy JSON reasoning */
+  /** Classical Structured Repair Planning: verified high-accuracy Indic craftsman reasoning */
   PLANNING: 'accounts/fireworks/models/minimax-m3p1-flash',
+  PLANNING_FALLBACK: 'accounts/fireworks/models/qwen3p8-max',
   PLANNING_30B: 'accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b',
-  PLANNING_MUSE: 'accounts/fireworks/models/muse-spark-open',
-  META_PLANNING: 'accounts/fireworks/models/llama4-scout-instruct-basic',
 } as const;
 
 // ─── Timeouts (milliseconds) ─────────────────────────────────────────────────
 export const TIMEOUTS = {
-  VISION: 20000,
-  DIALOGUE: 15000,
-  PLANNING: 15000,
+  VISION: 15000,
+  DIALOGUE: 10000,
+  PLANNING: 12000,
 } as const;
 
 // ─── Client Factory ──────────────────────────────────────────────────────────

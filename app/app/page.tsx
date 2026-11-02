@@ -8,6 +8,7 @@ import { Halo } from '@/components/Halo';
 import { Orb } from '@/components/Orb';
 import { TalkingSheet } from '@/components/TalkingSheet';
 import { RepairCarousel } from '@/components/RepairCarousel';
+import { BoloLogo } from '@/components/BoloLogo';
 import { groundObject, talkAsObject, cropImageFromBbox } from '@/lib/fireworks';
 import { speakImmediate, primeSpeechSynthesis } from '@/lib/speech';
 import { ArrowLeft, RotateCcw, Moon, Sun, AlertCircle } from 'lucide-react';
@@ -55,7 +56,7 @@ export default function BoloMainExperience() {
         primeSpeechSynthesis();
         setStatus('GROUNDING');
 
-        // 1. Point -> Box via Fireworks Qwen3-VL
+        // 1. Point -> Box via Fireworks Qwen3-VL / Meta Llama 3.2 Vision
         const groundRes = await groundObject(imageBase64 || '', point.x, point.y);
 
         if (!groundRes || !groundRes.success) {
@@ -106,7 +107,7 @@ export default function BoloMainExperience() {
   const getStatusText = () => {
     switch (status) {
       case 'GROUNDING':
-        return 'पहचान जारी है...';
+        return 'पहचान जारी...';
       case 'TALKING':
         return 'बोल रहा है...';
       case 'REPAIR':
@@ -118,42 +119,39 @@ export default function BoloMainExperience() {
 
   return (
     <main className="relative w-full h-[100dvh] overflow-hidden bg-[#0A0A0A] flex items-center justify-center select-none">
-      {/* Mobile-first viewport container (Always dark viewfinder bg-black) */}
+      {/* Mobile-first viewport container (Full bleed edge-to-edge on phones, framed on tablets/desktop) */}
       <div className="relative w-full h-full max-w-md max-h-[920px] bg-black text-white shadow-2xl overflow-hidden flex flex-col md:rounded-[40px] md:border md:border-white/10 md:h-[94vh]">
-        {/* Calm Developer-Crafted Header */}
-        <header className="absolute top-0 inset-x-0 z-40 p-4 pt-5 [padding-top:max(1.25rem,env(safe-area-inset-top))] flex items-center justify-between pointer-events-none">
-          {/* Back button + Brand Pill */}
-          <div className="pointer-events-auto flex items-center gap-2">
+        {/* Calm Developer Header with Official BoloLogo */}
+        <header className="absolute top-0 inset-x-0 z-40 p-3 sm:p-4 pt-4 sm:pt-5 [padding-top:max(1rem,env(safe-area-inset-top))] flex items-center justify-between pointer-events-none">
+          {/* Back button + Brand Pill with Official Logo */}
+          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 min-w-0">
             <Link
               href="/"
-              className="p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:bg-black/80 border border-white/15 transition shadow-sm"
+              className="p-2 sm:p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:bg-black/80 border border-white/15 transition shadow-sm shrink-0 active:scale-95"
               title="Return to Portal"
+              aria-label="Back to home"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
 
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-sm text-white">
-              {/* Indian Tricolor Micro Emblem */}
-              <div className="w-4 h-4 rounded-full overflow-hidden bg-gradient-to-b from-[#FF671F] via-white to-[#046A38] shadow-sm flex items-center justify-center">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#000080]" />
-              </div>
-              <span className="font-extrabold text-xs tracking-tight text-white">
-                BOLO
-              </span>
-              <span className="w-1 h-1 rounded-full bg-white/30" />
-              <span className="text-[11px] font-medium text-neutral-300 font-hindi">
-                {getStatusText()}
-              </span>
+            <div className="flex items-center px-2.5 sm:px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-sm text-white min-w-0">
+              <BoloLogo
+                size="sm"
+                showBadge={true}
+                statusText={getStatusText()}
+                isPulsing={status === 'GROUNDING' || status === 'TALKING'}
+              />
             </div>
           </div>
 
           {/* Quick Header Actions */}
-          <div className="pointer-events-auto flex items-center gap-2">
+          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
             {status !== 'IDLE' && (
               <button
                 onClick={resetToIdle}
-                className="p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:bg-black/80 border border-white/15 transition shadow-sm"
+                className="p-2 sm:p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:bg-black/80 border border-white/15 transition shadow-sm active:scale-95"
                 title="Reset to idle"
+                aria-label="Reset scanner"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
@@ -161,16 +159,17 @@ export default function BoloMainExperience() {
 
             <button
               onClick={toggleDarkMode}
-              className="p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 border border-white/15 shadow-sm hover:scale-105 active:scale-95 transition"
+              className="p-2 sm:p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 border border-white/15 shadow-sm hover:scale-105 active:scale-95 transition"
               title="Toggle theme"
+              aria-label="Toggle dark/light theme"
             >
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-neutral-300" />}
             </button>
           </div>
         </header>
 
-        {/* Viewport: CameraView with guaranteed full height expansion */}
-        <div className="flex-1 w-full min-h-0 relative flex flex-col p-2.5 pt-2 pb-2.5">
+        {/* Viewport: CameraView with edge-to-edge mobile expansion */}
+        <div className="flex-1 w-full min-h-0 relative flex flex-col p-0 md:p-2.5">
           <CameraView onTap={handleCameraTap}>
             <Halo
               bbox={bbox}
@@ -188,7 +187,7 @@ export default function BoloMainExperience() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -16, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="absolute top-20 inset-x-6 z-50 flex justify-center pointer-events-none"
+              className="absolute top-20 inset-x-4 sm:inset-x-6 z-50 flex justify-center pointer-events-none"
             >
               <div className="px-4 py-2 rounded-full bg-neutral-900/90 backdrop-blur-xl border border-white/20 text-white text-xs font-medium shadow-2xl flex items-center gap-2">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
@@ -213,7 +212,7 @@ export default function BoloMainExperience() {
         {/* Talking Sheet (slides up when status === 'TALKING') */}
         <TalkingSheet />
 
-        {/* Repair Carousel with Internet Search (overlay when status === 'REPAIR') */}
+        {/* Repair Carousel with Step-by-Step Guide (overlay when status === 'REPAIR') */}
         <RepairCarousel />
       </div>
     </main>

@@ -179,7 +179,7 @@ export const TalkingSheet: React.FC = () => {
           </div>
 
           {/* Row 2: Classical Speech Transcript Box */}
-          <div className="min-h-[88px] w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center shadow-inner">
+          <div className="min-h-[88px] max-h-[36vh] overflow-y-auto w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center shadow-inner overscroll-contain">
             {isLoadingDialogue ? (
               <div className="flex items-center gap-2 text-white/60 text-sm">
                 <Sparkles className="w-4 h-4 text-[#FF9933] animate-spin" />

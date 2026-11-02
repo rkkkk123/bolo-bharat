@@ -23,16 +23,23 @@ export const CameraView: React.FC<CameraViewProps> = ({ onTap, children }) => {
   const { videoRef, isActive, startCamera, toggleFacingMode } = useCamera();
   const { setTapPoint, setStatus } = useBoloStore();
   const [ripples, setRipples] = useState<Ripple[]>([]);
+  const lastTapTimeRef = useRef<number>(0);
 
-  // Capture tap coordinates, extract video frame, trigger store, and dispatch 60fps GPU ripple
-  const handleSurfaceTap = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
+  // Unified Pointer & Touch coordinate capture with 0ms latency on mobile
+  const handleInteraction = useCallback(
+    (clientX: number, clientY: number) => {
       if (!containerRef.current) return;
+
+      // Throttle double-triggers within 250ms
+      const now = Date.now();
+      if (now - lastTapTimeRef.current < 250) return;
+      lastTapTimeRef.current = now;
+
       const rect = containerRef.current.getBoundingClientRect();
 
       // Pixel coordinates relative to container (for 60fps transform: translate3d)
-      const pixelX = e.clientX - rect.left;
-      const pixelY = e.clientY - rect.top;
+      const pixelX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const pixelY = Math.max(0, Math.min(rect.height, clientY - rect.top));
 
       // Percentage coordinates (0 - 100) relative to container viewport
       const viewportPctX = Math.round((pixelX / rect.width) * 100);
@@ -44,7 +51,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ onTap, children }) => {
       primeSpeechSynthesis();
 
       // Add TapRipple at visual touch position
-      const rippleId = Date.now();
+      const rippleId = now;
       setRipples((prev) => [...prev.slice(-3), { id: rippleId, pixelX, pixelY }]);
 
       // Capture frame from active video element with precise object-cover coordinate mapping
@@ -95,52 +102,59 @@ export const CameraView: React.FC<CameraViewProps> = ({ onTap, children }) => {
     [setTapPoint, setStatus, onTap, videoRef, isActive]
   );
 
+  // Pointer Down handler (Fastest touch response on iOS Safari & Android Chrome)
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only respond to primary touch/click
+    if (!e.isPrimary) return;
+    handleInteraction(e.clientX, e.clientY);
+  };
+
   return (
     <div
       ref={containerRef}
-      onClick={handleSurfaceTap}
-      className="relative w-full h-full rounded-[36px] overflow-hidden bg-black flex items-center justify-center select-none cursor-crosshair shadow-2xl border border-white/10"
+      onPointerDown={handlePointerDown}
+      className="relative w-full h-full rounded-none md:rounded-[36px] overflow-hidden bg-black flex items-center justify-center select-none cursor-crosshair shadow-2xl md:border md:border-white/10 touch-none"
     >
-      {/* 1. Permanent Video Feed element (Guaranteed to fill viewport) */}
+      {/* 1. Permanent Video Feed element (Guaranteed to fill viewport edge-to-edge) */}
       <video
         ref={videoRef}
         playsInline
         muted
         autoPlay
-        className={`absolute inset-0 w-full h-full object-cover rounded-[36px] transition-opacity duration-300 z-10 pointer-events-none ${
+        className={`absolute inset-0 w-full h-full object-cover rounded-none md:rounded-[36px] transition-opacity duration-300 z-10 pointer-events-none ${
           isActive ? 'opacity-100' : 'opacity-0'
         }`}
       />
 
       {/* 2. Interactive Workspace Mock Surface (Shown when live camera is loading or permission pending) */}
       {!isActive && (
-        <div className="absolute inset-0 w-full h-full object-cover bg-gradient-to-br from-[#0E1017] via-[#090A0E] to-black flex items-center justify-center rounded-[36px] z-0">
+        <div className="absolute inset-0 w-full h-full object-cover bg-gradient-to-br from-[#0E1017] via-[#090A0E] to-black flex items-center justify-center rounded-none md:rounded-[36px] z-0">
           <div className="relative w-full h-full max-w-sm mx-auto overflow-hidden pointer-events-none opacity-85">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(255,103,31,0.14),transparent_70%)]" />
 
             {/* Coffee Mug Zone */}
-            <div className="absolute top-[26%] left-[18%] w-32 h-36 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
+            <div className="absolute top-[26%] left-[16%] w-28 sm:w-32 h-32 sm:h-36 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
               <span className="text-3xl mb-1">☕</span>
               <span className="text-white text-xs font-semibold">Coffee Mug</span>
               <span className="text-white/40 text-[10px]">कॉफी मग</span>
             </div>
 
             {/* Smart Watch Zone */}
-            <div className="absolute top-[32%] right-[16%] w-28 h-28 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
+            <div className="absolute top-[32%] right-[14%] w-24 sm:w-28 h-24 sm:h-28 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
               <span className="text-2xl mb-1">⌚</span>
               <span className="text-white text-xs font-semibold">Smart Watch</span>
               <span className="text-white/40 text-[10px]">स्मार्ट वॉच</span>
             </div>
 
             {/* Plant Zone */}
-            <div className="absolute top-[10%] right-[22%] w-24 h-28 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
+            <div className="absolute top-[10%] right-[20%] w-20 sm:w-24 h-24 sm:h-28 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
               <span className="text-2xl mb-1">🪴</span>
               <span className="text-white text-xs font-semibold">Plant</span>
               <span className="text-white/40 text-[10px]">पौधा</span>
             </div>
 
             {/* Notebook Zone */}
-            <div className="absolute bottom-[24%] left-[22%] w-48 h-28 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
+            <div className="absolute bottom-[24%] left-[18%] w-44 sm:w-48 h-24 sm:h-28 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
               <span className="text-2xl mb-1">📖</span>
               <span className="text-white text-xs font-semibold">Notebook</span>
               <span className="text-white/40 text-[10px]">नोटबुक</span>
@@ -148,30 +162,33 @@ export const CameraView: React.FC<CameraViewProps> = ({ onTap, children }) => {
           </div>
 
           {/* Interactive Start Camera Banner on user click */}
-          <div className="absolute top-16 inset-x-4 z-20 flex justify-center pointer-events-auto">
+          <div className="absolute top-20 inset-x-4 z-20 flex justify-center pointer-events-auto">
             <button
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 startCamera();
               }}
-              className="px-4 py-2.5 rounded-full bg-gradient-to-r from-[#FF671F] via-[#FF8833] to-[#046A38] text-white text-xs font-semibold shadow-lg shadow-orange-500/25 flex items-center gap-2 hover:opacity-95 active:scale-95 transition"
+              className="px-4 py-2.5 rounded-full bg-gradient-to-r from-[#FF671F] via-[#FF8833] to-[#046A38] text-white text-xs font-semibold shadow-lg shadow-orange-500/25 flex items-center gap-2 hover:opacity-95 active:scale-95 transition cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>कैमरा चालू करें (Click to Enable Camera)</span>
+              <span>कैमरा चालू करें (Enable Live Camera)</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Camera Flip Button (when active) */}
+      {/* Camera Flip Button (when active, positioned cleanly on upper right) */}
       {isActive && (
         <button
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             toggleFacingMode();
           }}
-          className="absolute top-16 right-4 z-30 p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-black/80 border border-white/15 transition shadow-lg pointer-events-auto"
+          className="absolute top-20 right-3.5 z-30 p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-black/80 border border-white/15 transition shadow-lg pointer-events-auto active:scale-90"
           title="Flip camera"
+          aria-label="Flip camera between front and back"
         >
           <RefreshCw className="w-4 h-4" />
         </button>
@@ -199,7 +216,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ onTap, children }) => {
       </AnimatePresence>
 
       {/* Viewport Guides: Delicate 1px white & saffron corner focus markers */}
-      <div className="absolute inset-5 pointer-events-none border border-white/5 rounded-[28px] z-20">
+      <div className="absolute inset-4 sm:inset-5 pointer-events-none border border-white/5 rounded-2xl md:rounded-[28px] z-20">
         <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t border-l border-white/70 rounded-tl-sm" />
         <div className="absolute -top-0.5 -right-0.5 w-4 h-4 border-t border-r border-white/70 rounded-tr-sm" />
         <div className="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b border-l border-white/70 rounded-bl-sm" />
